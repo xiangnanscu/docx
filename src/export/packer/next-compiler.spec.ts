@@ -36,7 +36,7 @@ describe("Compiler", () => {
                 const fileNames = Object.keys(zipFile.files).map((f) => zipFile.files[f].name);
 
                 expect(fileNames).is.an.instanceof(Array);
-                expect(fileNames).has.length(19);
+                expect(fileNames).has.length(20);
                 expect(fileNames).to.include("word/document.xml");
                 expect(fileNames).to.include("word/styles.xml");
                 expect(fileNames).to.include("docProps/core.xml");
@@ -96,7 +96,7 @@ describe("Compiler", () => {
                 const fileNames = Object.keys(zipFile.files).map((f) => zipFile.files[f].name);
 
                 expect(fileNames).is.an.instanceof(Array);
-                expect(fileNames).has.length(27);
+                expect(fileNames).has.length(28);
 
                 expect(fileNames).to.include("word/header1.xml");
                 expect(fileNames).to.include("word/_rels/header1.xml.rels");
@@ -106,6 +106,41 @@ describe("Compiler", () => {
                 expect(fileNames).to.include("word/_rels/footer1.xml.rels");
                 expect(fileNames).to.include("word/footer2.xml");
                 expect(fileNames).to.include("word/_rels/footer2.xml.rels");
+            },
+            {
+                timeout: 99999999,
+            },
+        );
+
+        it(
+            "should pack subfile overrides",
+            async () => {
+                const file = new File({
+                    sections: [],
+                    comments: {
+                        children: [],
+                    },
+                });
+                const subfileData1 = "comments";
+                const subfileData2 = "commentsExtended";
+                const overrides = [
+                    { path: "word/comments.xml", data: subfileData1 },
+                    { path: "word/commentsExtended.xml", data: subfileData2 },
+                ];
+                const zipFile = compiler.compile(file, "", overrides);
+                const fileNames = Object.keys(zipFile.files).map((f) => zipFile.files[f].name);
+
+                expect(fileNames).is.an.instanceof(Array);
+                expect(fileNames).has.length(21);
+
+                expect(fileNames).to.include("word/comments.xml");
+                expect(fileNames).to.include("word/commentsExtended.xml");
+
+                const commentsText = await zipFile.file("word/comments.xml")?.async("text");
+                const commentsExtendedText = await zipFile.file("word/commentsExtended.xml")?.async("text");
+
+                expect(commentsText).toBe(subfileData1);
+                expect(commentsExtendedText).toBe(subfileData2);
             },
             {
                 timeout: 99999999,
@@ -125,11 +160,10 @@ describe("Compiler", () => {
                 ],
             });
 
-            // tslint:disable-next-line: no-string-literal
             const spy = vi.spyOn(compiler["formatter"], "format");
 
             compiler.compile(file);
-            expect(spy).toBeCalledTimes(15);
+            expect(spy).toBeCalledTimes(16);
         });
 
         it("should work with media datas", () => {

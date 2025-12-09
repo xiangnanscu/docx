@@ -4,6 +4,7 @@ import { FileChild } from "@file/file-child";
 import { AlignmentType } from "../paragraph";
 import { TableGrid } from "./grid";
 import { TableCell, VerticalMergeType } from "./table-cell";
+import { ITableCellSpacingProperties } from "./table-cell-spacing";
 import { ITableBordersOptions, ITableFloatOptions, TableProperties } from "./table-properties";
 import { ITableCellMarginOptions } from "./table-properties/table-cell-margin";
 import { TableLayoutType } from "./table-properties/table-layout";
@@ -20,7 +21,7 @@ import { ITableWidthProperties } from "./table-width";
     table will make it look reasonable, as the layout
     algorithm will expand columns to fit its content
  */
-export interface ITableOptions {
+export type ITableOptions = {
     readonly rows: readonly TableRow[];
     readonly width?: ITableWidthProperties;
     readonly columnWidths?: readonly number[];
@@ -32,7 +33,8 @@ export interface ITableOptions {
     readonly borders?: ITableBordersOptions;
     readonly alignment?: (typeof AlignmentType)[keyof typeof AlignmentType];
     readonly visuallyRightToLeft?: boolean;
-}
+    readonly cellSpacing?: ITableCellSpacingProperties;
+};
 
 export class Table extends FileChild {
     public constructor({
@@ -48,6 +50,7 @@ export class Table extends FileChild {
         borders,
         alignment,
         visuallyRightToLeft,
+        cellSpacing,
     }: ITableOptions) {
         super("w:tbl");
 
@@ -62,6 +65,7 @@ export class Table extends FileChild {
                 alignment,
                 cellMargin: margins,
                 visuallyRightToLeft,
+                cellSpacing,
             }),
         );
 

@@ -1,23 +1,25 @@
 import JSZip from "jszip";
 import { Element, js2xml } from "xml-js";
 
-import { ConcreteHyperlink, ExternalHyperlink, ParagraphChild } from "@file/paragraph";
-import { FileChild } from "@file/file-child";
-import { IMediaData, Media } from "@file/media";
+import { ImageReplacer } from "@export/packer/image-replacer";
+import { DocumentAttributeNamespaces } from "@file/document";
 import { IViewWrapper } from "@file/document-wrapper";
 import { File } from "@file/file";
-import { IContext } from "@file/xml-components";
-import { ImageReplacer } from "@export/packer/image-replacer";
+import { FileChild } from "@file/file-child";
+import { IMediaData, Media } from "@file/media";
+import { ConcreteHyperlink, ExternalHyperlink, ParagraphChild } from "@file/paragraph";
 import { TargetModeType } from "@file/relationships/relationship/relationship";
+import { IContext } from "@file/xml-components";
 import { uniqueId } from "@util/convenience-functions";
+import { OutputByType, OutputType } from "@util/output-type";
 
+import { appendContentType } from "./content-types-manager";
+import { appendRelationship, getNextRelationshipIndex } from "./relationship-manager";
 import { replacer } from "./replacer";
 import { toJson } from "./util";
-import { appendRelationship, getNextRelationshipIndex } from "./relationship-manager";
-import { appendContentType } from "./content-types-manager";
 
 // eslint-disable-next-line functional/prefer-readonly-type
-export type InputDataType = Buffer | string | number[] | Uint8Array | ArrayBuffer | Blob | NodeJS.ReadableStream;
+export type InputDataType = Buffer | string | number[] | Uint8Array | ArrayBuffer | Blob | NodeJS.ReadableStream | JSZip;
 
 export const PatchType = {
     DOCUMENT: "file",
@@ -34,50 +36,60 @@ type FilePatch = {
     readonly children: readonly FileChild[];
 };
 
-interface IImageRelationshipAddition {
+type IImageRelationshipAddition = {
     readonly key: string;
     readonly mediaDatas: readonly IMediaData[];
-}
+};
 
-interface IHyperlinkRelationshipAddition {
+type IHyperlinkRelationshipAddition = {
     readonly key: string;
     readonly hyperlink: { readonly id: string; readonly link: string };
-}
+};
 
 export type IPatch = ParagraphPatch | FilePatch;
 
-// From JSZip
-type OutputByType = {
-    readonly base64: string;
-    // eslint-disable-next-line id-denylist
-    readonly string: string;
-    readonly text: string;
-    readonly binarystring: string;
-    readonly array: readonly number[];
-    readonly uint8array: Uint8Array;
-    readonly arraybuffer: ArrayBuffer;
-    readonly blob: Blob;
-    readonly nodebuffer: Buffer;
-};
-
-export type PatchDocumentOutputType = keyof OutputByType;
+export type PatchDocumentOutputType = OutputType;
 
 export type PatchDocumentOptions<T extends PatchDocumentOutputType = PatchDocumentOutputType> = {
     readonly outputType: T;
     readonly data: InputDataType;
-    readonly patches: { readonly [key: string]: IPatch };
+    readonly patches: Readonly<Record<string, IPatch>>;
     readonly keepOriginalStyles?: boolean;
+    readonly placeholderDelimiters?: Readonly<{
+        readonly start: string;
+        readonly end: string;
+    }>;
+    readonly recursive?: boolean;
 };
 
 const imageReplacer = new ImageReplacer();
+const UTF16LE = new Uint8Array([0xff, 0xfe]);
+const UTF16BE = new Uint8Array([0xfe, 0xff]);
+
+const compareByteArrays = (a: Uint8Array, b: Uint8Array): boolean => {
+    if (a.length !== b.length) {
+        return false;
+    }
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) {
+            return false;
+        }
+    }
+    return true;
+};
 
 export const patchDocument = async <T extends PatchDocumentOutputType = PatchDocumentOutputType>({
     outputType,
     data,
     patches,
     keepOriginalStyles,
+    placeholderDelimiters = { start: "{{", end: "}}" } as const,
+    /**
+     * Search for occurrences over patched document
+     */
+    recursive = true,
 }: PatchDocumentOptions<T>): Promise<OutputByType[T]> => {
-    const zipContent = await JSZip.loadAsync(data);
+    const zipContent = data instanceof JSZip ? data : await JSZip.loadAsync(data);
     const contexts = new Map<string, IContext>();
     const file = {
         Media: new Media(),
@@ -94,12 +106,35 @@ export const patchDocument = async <T extends PatchDocumentOutputType = PatchDoc
     const binaryContentMap = new Map<string, Uint8Array>();
 
     for (const [key, value] of Object.entries(zipContent.files)) {
+        const binaryValue = await value.async("uint8array");
+        const startBytes = binaryValue.slice(0, 2);
+        if (compareByteArrays(startBytes, UTF16LE) || compareByteArrays(startBytes, UTF16BE)) {
+            binaryContentMap.set(key, binaryValue);
+            continue;
+        }
+
         if (!key.endsWith(".xml") && !key.endsWith(".rels")) {
-            binaryContentMap.set(key, await value.async("uint8array"));
+            binaryContentMap.set(key, binaryValue);
             continue;
         }
 
         const json = toJson(await value.async("text"));
+
+        if (key === "word/document.xml") {
+            const document = json.elements?.find((i) => i.name === "w:document");
+            if (document && document.attributes) {
+                // We could check all namespaces from Document, but we'll instead
+                // check only those that may be used by our element types.
+
+                for (const ns of ["mc", "wp", "r", "w15", "m"] as const) {
+                    // eslint-disable-next-line functional/immutable-data
+                    document.attributes[`xmlns:${ns}`] = DocumentAttributeNamespaces[ns];
+                }
+                // eslint-disable-next-line functional/immutable-data
+                document.attributes["mc:Ignorable"] = `${document.attributes["mc:Ignorable"] || ""} w15`.trim();
+            }
+        }
+
         if (key.startsWith("word/") && !key.endsWith(".xml.rels")) {
             const context: IContext = {
                 file,
@@ -126,45 +161,50 @@ export const patchDocument = async <T extends PatchDocumentOutputType = PatchDoc
             };
             contexts.set(key, context);
 
+            if (!placeholderDelimiters?.start.trim() || !placeholderDelimiters?.end.trim()) {
+                throw new Error("Both start and end delimiters must be non-empty strings.");
+            }
+
+            const { start, end } = placeholderDelimiters;
+
             for (const [patchKey, patchValue] of Object.entries(patches)) {
-                const patchText = `{{${patchKey}}}`;
+                const patchText = `${start}${patchKey}${end}`;
                 // TODO: mutates json. Make it immutable
                 // We need to loop through to catch every occurrence of the patch text
                 // It is possible that the patch text is in the same run
                 // This algorithm is limited to one patch per text run
-                // Once it cannot find any more occurrences, it will throw an error, and then we break out of the loop
+                // We break out of the loop once it cannot find any more occurrences
                 // https://github.com/dolanmiu/docx/issues/2267
-                // eslint-disable-next-line no-constant-condition
                 while (true) {
-                    try {
-                        replacer({
-                            json,
-                            patch: {
-                                ...patchValue,
-                                children: patchValue.children.map((element) => {
-                                    // We need to replace external hyperlinks with concrete hyperlinks
-                                    if (element instanceof ExternalHyperlink) {
-                                        const concreteHyperlink = new ConcreteHyperlink(element.options.children, uniqueId());
-                                        // eslint-disable-next-line functional/immutable-data
-                                        hyperlinkRelationshipAdditions.push({
-                                            key,
-                                            hyperlink: {
-                                                id: concreteHyperlink.linkId,
-                                                link: element.options.link,
-                                            },
-                                        });
-                                        return concreteHyperlink;
-                                    } else {
-                                        return element;
-                                    }
-                                }),
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            } as any,
-                            patchText,
-                            context,
-                            keepOriginalStyles,
-                        });
-                    } catch {
+                    const { didFindOccurrence } = replacer({
+                        json,
+                        patch: {
+                            ...patchValue,
+                            children: patchValue.children.map((element) => {
+                                // We need to replace external hyperlinks with concrete hyperlinks
+                                if (element instanceof ExternalHyperlink) {
+                                    const concreteHyperlink = new ConcreteHyperlink(element.options.children, uniqueId());
+                                    // eslint-disable-next-line functional/immutable-data
+                                    hyperlinkRelationshipAdditions.push({
+                                        key,
+                                        hyperlink: {
+                                            id: concreteHyperlink.linkId,
+                                            link: element.options.link,
+                                        },
+                                    });
+                                    return concreteHyperlink;
+                                } else {
+                                    return element;
+                                }
+                            }),
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        } as any,
+                        patchText,
+                        context,
+                        keepOriginalStyles,
+                    });
+                    // What the reason doing that? Once document is patched - it search over patched json again, that takes too long if patched document has big and deep structure.
+                    if (!recursive || !didFindOccurrence) {
                         break;
                     }
                 }
@@ -260,7 +300,15 @@ export const patchDocument = async <T extends PatchDocumentOutputType = PatchDoc
 };
 
 const toXml = (jsonObj: Element): string => {
-    const output = js2xml(jsonObj);
+    const output = js2xml(jsonObj, {
+        attributeValueFn: (str) =>
+            String(str)
+                .replace(/&(?!amp;|lt;|gt;|quot;|apos;)/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&apos;"), // cspell:words apos
+    });
     return output;
 };
 

@@ -1,7 +1,6 @@
 // https://c-rex.net/projects/samples/ooxml/e1/Part4/OOXML_P4_DOCX_docPr_topic_ID0ES32OB.html
-import { IContext, IXmlableObject, NextAttributeComponent, XmlComponent } from "@file/xml-components";
 import { ConcreteHyperlink } from "@file/paragraph";
-
+import { IContext, IXmlableObject, NextAttributeComponent, XmlComponent } from "@file/xml-components";
 import { docPropertiesUniqueNumericIdGen } from "@util/convenience-functions";
 
 import { createHyperlinkClick } from "./doc-properties-children";
@@ -18,11 +17,11 @@ import { createHyperlinkClick } from "./doc-properties-children";
 //     <attribute name="hidden" type="xsd:boolean" use="optional" default="false" />
 // </complexType>
 
-export interface DocPropertiesOptions {
+export type DocPropertiesOptions = {
     readonly name: string;
-    readonly description: string;
-    readonly title: string;
-}
+    readonly description?: string;
+    readonly title?: string;
+};
 
 export class DocProperties extends XmlComponent {
     private readonly docPropertiesUniqueNumericId = docPropertiesUniqueNumericIdGen();
@@ -30,26 +29,32 @@ export class DocProperties extends XmlComponent {
     public constructor({ name, description, title }: DocPropertiesOptions = { name: "", description: "", title: "" }) {
         super("wp:docPr");
 
-        this.root.push(
-            new NextAttributeComponent({
-                id: {
-                    key: "id",
-                    value: this.docPropertiesUniqueNumericId(),
-                },
-                name: {
-                    key: "name",
-                    value: name,
-                },
-                description: {
-                    key: "descr",
-                    value: description,
-                },
-                title: {
-                    key: "title",
-                    value: title,
-                },
-            }),
-        );
+        const attributes: Record<string, { readonly key: string; readonly value: string | number }> = {
+            id: {
+                key: "id",
+                value: this.docPropertiesUniqueNumericId(),
+            },
+            name: {
+                key: "name",
+                value: name,
+            },
+        };
+
+        if (description !== null && description !== undefined) {
+            attributes.description = {
+                key: "descr",
+                value: description,
+            };
+        }
+
+        if (title !== null && title !== undefined) {
+            attributes.title = {
+                key: "title",
+                value: title,
+            };
+        }
+
+        this.root.push(new NextAttributeComponent(attributes));
     }
 
     public prepForXml(context: IContext): IXmlableObject | undefined {
@@ -60,7 +65,6 @@ export class DocProperties extends XmlComponent {
             }
 
             this.root.push(createHyperlinkClick(element.linkId, true));
-
             break;
         }
 

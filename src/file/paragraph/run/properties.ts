@@ -1,5 +1,5 @@
 // https://www.ecma-international.org/wp-content/uploads/ECMA-376-1_5th_edition_december_2016.zip page 297, section 17.3.2.21
-/* eslint-disable functional/immutable-data */
+
 import { BorderElement, IBorderOptions } from "@file/border";
 import { IShadingAttributesProperties, Shading } from "@file/shading";
 import { ChangeAttributes, IChangedAttributesProperties } from "@file/track-revision/track-revision";
@@ -15,18 +15,17 @@ import { PositiveUniversalMeasure, UniversalMeasure } from "@util/values";
 
 import { EmphasisMark, EmphasisMarkType } from "./emphasis-mark";
 import { CharacterSpacing, Color, Highlight, HighlightComplexScript } from "./formatting";
-import { createLanguageComponent, ILanguageOptions } from "./language";
+import { ILanguageOptions, createLanguageComponent } from "./language";
 import { IFontAttributesProperties, RunFonts } from "./run-fonts";
 import { ITextOutlineOptions, RunTextOutline } from "./run-text-outline";
 import { SubScript, SuperScript } from "./script";
 import { Underline, UnderlineType } from "./underline";
 
-interface IFontOptions {
+type IFontOptions = {
     readonly name: string;
     readonly hint?: string;
-}
+};
 
-/* eslint-disable @typescript-eslint/naming-convention */
 export const TextEffect = {
     BLINK_BACKGROUND: "blinkBackground",
     LIGHTS: "lights",
@@ -64,9 +63,7 @@ export const HighlightColor = {
     YELLOW: "yellow",
 } as const;
 
-/* eslint-enable */
-
-export interface IRunStylePropertiesOptions {
+export type IRunStylePropertiesOptions = {
     readonly noProof?: boolean;
     readonly bold?: boolean;
     readonly boldComplexScript?: boolean;
@@ -108,13 +105,13 @@ export interface IRunStylePropertiesOptions {
     readonly specVanish?: boolean;
     readonly scale?: number;
     readonly math?: boolean;
-}
+};
 
-export interface IRunPropertiesOptions extends IRunStylePropertiesOptions {
+export type IRunPropertiesOptions = {
     readonly style?: string;
-}
+} & IRunStylePropertiesOptions;
 
-export interface IRunPropertiesChangeOptions extends IRunPropertiesOptions, IChangedAttributesProperties {}
+export type IRunPropertiesChangeOptions = {} & IRunPropertiesOptions & IChangedAttributesProperties;
 
 // <xsd:group name="EG_RPrBase">
 //     <xsd:choice>
@@ -159,7 +156,6 @@ export interface IRunPropertiesChangeOptions extends IRunPropertiesOptions, ICha
 //     <xsd:element name="oMath" type="CT_OnOff"/>
 //     </xsd:choice>
 // </xsd:group>
-/* eslint-disable functional/immutable-data */
 
 export class RunProperties extends IgnoreIfEmptyXmlComponent {
     public constructor(options?: IRunPropertiesOptions) {
@@ -168,12 +164,25 @@ export class RunProperties extends IgnoreIfEmptyXmlComponent {
         if (!options) {
             return;
         }
-        if (options.noProof !== undefined) {
-            this.push(new OnOffElement("w:noProof", options.noProof));
+
+        if (options.style) {
+            this.push(new StringValueElement("w:rStyle", options.style));
         }
+
+        if (options.font) {
+            if (typeof options.font === "string") {
+                this.push(new RunFonts(options.font));
+            } else if ("name" in options.font) {
+                this.push(new RunFonts(options.font.name, options.font.hint));
+            } else {
+                this.push(new RunFonts(options.font));
+            }
+        }
+
         if (options.bold !== undefined) {
             this.push(new OnOffElement("w:b", options.bold));
         }
+
         if ((options.boldComplexScript === undefined && options.bold !== undefined) || options.boldComplexScript) {
             this.push(new OnOffElement("w:bCs", options.boldComplexScript ?? options.bold));
         }
@@ -186,20 +195,53 @@ export class RunProperties extends IgnoreIfEmptyXmlComponent {
             this.push(new OnOffElement("w:iCs", options.italicsComplexScript ?? options.italics));
         }
 
-        if (options.underline) {
-            this.push(new Underline(options.underline.type, options.underline.color));
+        // These two are mutually exclusive
+        if (options.smallCaps !== undefined) {
+            this.push(new OnOffElement("w:smallCaps", options.smallCaps));
+        } else if (options.allCaps !== undefined) {
+            this.push(new OnOffElement("w:caps", options.allCaps));
         }
 
-        if (options.effect) {
-            this.push(new StringValueElement("w:effect", options.effect));
+        if (options.strike !== undefined) {
+            this.push(new OnOffElement("w:strike", options.strike));
         }
 
-        if (options.emphasisMark) {
-            this.push(new EmphasisMark(options.emphasisMark.type));
+        if (options.doubleStrike !== undefined) {
+            this.push(new OnOffElement("w:dstrike", options.doubleStrike));
+        }
+
+        if (options.emboss !== undefined) {
+            this.push(new OnOffElement("w:emboss", options.emboss));
+        }
+
+        if (options.imprint !== undefined) {
+            this.push(new OnOffElement("w:imprint", options.imprint));
+        }
+
+        if (options.noProof !== undefined) {
+            this.push(new OnOffElement("w:noProof", options.noProof));
+        }
+
+        if (options.snapToGrid !== undefined) {
+            this.push(new OnOffElement("w:snapToGrid", options.snapToGrid));
+        }
+
+        if (options.vanish) {
+            // https://c-rex.net/projects/samples/ooxml/e1/Part4/OOXML_P4_DOCX_vanish_topic_ID0E6W3O.html
+            // http://www.datypic.com/sc/ooxml/e-w_vanish-1.html
+            this.push(new OnOffElement("w:vanish", options.vanish));
         }
 
         if (options.color) {
             this.push(new Color(options.color));
+        }
+
+        if (options.characterSpacing) {
+            this.push(new CharacterSpacing(options.characterSpacing));
+        }
+
+        if (options.scale !== undefined) {
+            this.push(new NumberValueElement("w:w", options.scale));
         }
 
         if (options.kern) {
@@ -219,47 +261,6 @@ export class RunProperties extends IgnoreIfEmptyXmlComponent {
             this.push(new HpsMeasureElement("w:szCs", szCs));
         }
 
-        if (options.rightToLeft !== undefined) {
-            this.push(new OnOffElement("w:rtl", options.rightToLeft));
-        }
-
-        // These two are mutually exclusive
-        if (options.smallCaps !== undefined) {
-            this.push(new OnOffElement("w:smallCaps", options.smallCaps));
-        } else if (options.allCaps !== undefined) {
-            this.push(new OnOffElement("w:caps", options.allCaps));
-        }
-
-        if (options.strike !== undefined) {
-            this.push(new OnOffElement("w:strike", options.strike));
-        }
-
-        if (options.doubleStrike !== undefined) {
-            this.push(new OnOffElement("w:dstrike", options.doubleStrike));
-        }
-
-        if (options.subScript) {
-            this.push(new SubScript());
-        }
-
-        if (options.superScript) {
-            this.push(new SuperScript());
-        }
-
-        if (options.style) {
-            this.push(new StringValueElement("w:rStyle", options.style));
-        }
-
-        if (options.font) {
-            if (typeof options.font === "string") {
-                this.push(new RunFonts(options.font));
-            } else if ("name" in options.font) {
-                this.push(new RunFonts(options.font.name, options.font.hint));
-            } else {
-                this.push(new RunFonts(options.font));
-            }
-        }
-
         if (options.highlight) {
             this.push(new Highlight(options.highlight));
         }
@@ -271,51 +272,45 @@ export class RunProperties extends IgnoreIfEmptyXmlComponent {
             this.push(new HighlightComplexScript(highlightCs));
         }
 
-        if (options.characterSpacing) {
-            this.push(new CharacterSpacing(options.characterSpacing));
+        if (options.underline) {
+            this.push(new Underline(options.underline.type, options.underline.color));
         }
 
-        if (options.emboss !== undefined) {
-            this.push(new OnOffElement("w:emboss", options.emboss));
-        }
-
-        if (options.imprint !== undefined) {
-            this.push(new OnOffElement("w:imprint", options.imprint));
-        }
-
-        if (options.shading) {
-            this.push(new Shading(options.shading));
-        }
-
-        if (options.revision) {
-            this.push(new RunPropertiesChange(options.revision));
+        if (options.effect) {
+            this.push(new StringValueElement("w:effect", options.effect));
         }
 
         if (options.border) {
             this.push(new BorderElement("w:bdr", options.border));
         }
 
-        if (options.snapToGrid !== undefined) {
-            this.push(new OnOffElement("w:snapToGrid", options.snapToGrid));
+        if (options.shading) {
+            this.push(new Shading(options.shading));
         }
 
-        if (options.vanish) {
-            // https://c-rex.net/projects/samples/ooxml/e1/Part4/OOXML_P4_DOCX_vanish_topic_ID0E6W3O.html
-            // http://www.datypic.com/sc/ooxml/e-w_vanish-1.html
-            this.push(new OnOffElement("w:vanish", options.vanish));
+        if (options.subScript) {
+            this.push(new SubScript());
+        }
+
+        if (options.superScript) {
+            this.push(new SuperScript());
+        }
+
+        if (options.rightToLeft !== undefined) {
+            this.push(new OnOffElement("w:rtl", options.rightToLeft));
+        }
+
+        if (options.emphasisMark) {
+            this.push(new EmphasisMark(options.emphasisMark.type));
+        }
+
+        if (options.language) {
+            this.push(createLanguageComponent(options.language));
         }
 
         if (options.specVanish) {
             // https://c-rex.net/projects/samples/ooxml/e1/Part4/OOXML_P4_DOCX_specVanish_topic_ID0EIE1O.html
             this.push(new OnOffElement("w:specVanish", options.vanish));
-        }
-
-        if (options.scale !== undefined) {
-            this.push(new NumberValueElement("w:w", options.scale));
-        }
-
-        if (options.language) {
-            this.push(createLanguageComponent(options.language));
         }
 
         if (options.math) {
@@ -325,14 +320,15 @@ export class RunProperties extends IgnoreIfEmptyXmlComponent {
         if (options.textOutline) {
           this.root.push(new RunTextOutline(options.textOutline));
       }
+        if (options.revision) {
+            this.push(new RunPropertiesChange(options.revision));
+        }
     }
 
     public push(item: XmlComponent): void {
         this.root.push(item);
     }
 }
-
-/* eslint-enable */
 
 export class RunPropertiesChange extends XmlComponent {
     public constructor(options: IRunPropertiesChangeOptions) {

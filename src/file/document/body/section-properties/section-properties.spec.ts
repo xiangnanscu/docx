@@ -6,7 +6,7 @@ import { FooterWrapper } from "@file/footer-wrapper";
 import { HeaderWrapper } from "@file/header-wrapper";
 import { Media } from "@file/media";
 import { NumberFormat } from "@file/shared/number-format";
-import { VerticalAlign } from "@file/vertical-align";
+import { VerticalAlignSection } from "@file/vertical-align";
 import { convertInchesToTwip } from "@util/convenience-functions";
 
 import { PageOrientation } from "./properties";
@@ -15,7 +15,7 @@ import { LineNumberRestartFormat } from "./properties/line-number";
 import { PageBorderOffsetFrom } from "./properties/page-borders";
 import { PageTextDirectionType } from "./properties/page-text-direction";
 import { SectionType } from "./properties/section-type";
-import { sectionMarginDefaults, sectionPageSizeDefaults, SectionProperties } from "./section-properties";
+import { SectionProperties, sectionMarginDefaults, sectionPageSizeDefaults } from "./section-properties";
 
 const DEFAULT_MARGINS = {
     "w:bottom": sectionMarginDefaults.BOTTOM,
@@ -75,7 +75,7 @@ describe("SectionProperties", () => {
                     even: new FooterWrapper(media, 200),
                 },
                 titlePage: true,
-                verticalAlign: VerticalAlign.TOP,
+                verticalAlign: VerticalAlignSection.TOP,
             });
 
             const tree = new Formatter().format(properties);

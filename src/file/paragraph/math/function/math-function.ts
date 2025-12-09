@@ -2,14 +2,14 @@
 import { XmlComponent } from "@file/xml-components";
 
 import { MathComponent } from "../math-component";
-import { MathBase } from "../n-ary";
+import { createMathBase } from "../n-ary";
 import { MathFunctionName } from "./math-function-name";
 import { MathFunctionProperties } from "./math-function-properties";
 
-export interface IMathFunctionOptions {
+export type IMathFunctionOptions = {
     readonly children: readonly MathComponent[];
     readonly name: readonly MathComponent[];
-}
+};
 
 export class MathFunction extends XmlComponent {
     public constructor(options: IMathFunctionOptions) {
@@ -17,6 +17,6 @@ export class MathFunction extends XmlComponent {
 
         this.root.push(new MathFunctionProperties());
         this.root.push(new MathFunctionName(options.name));
-        this.root.push(new MathBase(options.children));
+        this.root.push(createMathBase({ children: options.children }));
     }
 }

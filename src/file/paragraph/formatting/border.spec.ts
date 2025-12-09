@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Formatter } from "@export/formatter";
-
 import { BorderStyle } from "@file/border";
+
 import { Border, ThematicBreak } from "./border";
 
 describe("Border", () => {
@@ -32,6 +32,12 @@ describe("Border", () => {
                     space: 7,
                     style: BorderStyle.WAVE,
                     size: 8,
+                },
+                between: {
+                    color: "FF0000",
+                    space: 9,
+                    style: BorderStyle.WAVE,
+                    size: 10,
                 },
             });
 
@@ -75,6 +81,16 @@ describe("Border", () => {
                                 "w:color": "FF0000",
                                 "w:space": 7,
                                 "w:sz": 8,
+                                "w:val": "wave",
+                            },
+                        },
+                    },
+                    {
+                        "w:between": {
+                            _attr: {
+                                "w:color": "FF0000",
+                                "w:space": 9,
+                                "w:sz": 10,
                                 "w:val": "wave",
                             },
                         },

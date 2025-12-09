@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { Formatter } from "@export/formatter";
 
 import { EmphasisMarkType } from "./emphasis-mark";
-import { UnderlineType } from "./underline";
 import { SymbolRun } from "./symbol-run";
+import { UnderlineType } from "./underline";
 
 describe("SymbolRun", () => {
     let run: SymbolRun;
@@ -61,13 +61,13 @@ describe("SymbolRun", () => {
                             { "w:bCs": {} },
                             { "w:i": {} },
                             { "w:iCs": {} },
-                            { "w:u": { _attr: { "w:val": "double", "w:color": "ff0000" } } },
-                            { "w:em": { _attr: { "w:val": "dot" } } },
                             { "w:color": { _attr: { "w:val": "00FF00" } } },
                             { "w:sz": { _attr: { "w:val": 40 } } },
                             { "w:szCs": { _attr: { "w:val": 40 } } },
                             { "w:highlight": { _attr: { "w:val": "yellow" } } },
                             { "w:highlightCs": { _attr: { "w:val": "yellow" } } },
+                            { "w:u": { _attr: { "w:val": "double", "w:color": "ff0000" } } },
+                            { "w:em": { _attr: { "w:val": "dot" } } },
                         ],
                     },
                     {

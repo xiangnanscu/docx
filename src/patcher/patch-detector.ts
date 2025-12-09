@@ -1,7 +1,8 @@
 import JSZip from "jszip";
-import { toJson } from "./util";
-import { traverse } from "./traverser";
+
 import { InputDataType } from "./from-docx";
+import { traverse } from "./traverser";
+import { toJson } from "./util";
 
 type PatchDetectorOptions = {
     readonly data: InputDataType;
@@ -9,7 +10,7 @@ type PatchDetectorOptions = {
 
 /** Detects which patches are needed/present in a template */
 export const patchDetector = async ({ data }: PatchDetectorOptions): Promise<readonly string[]> => {
-    const zipContent = await JSZip.loadAsync(data);
+    const zipContent = data instanceof JSZip ? data : await JSZip.loadAsync(data);
     const patches = new Set<string>();
 
     for (const [key, value] of Object.entries(zipContent.files)) {

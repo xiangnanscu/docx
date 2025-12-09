@@ -1,6 +1,5 @@
 import { AttributeData, AttributePayload, Attributes, NextAttributeComponent, XmlComponent } from "@file/xml-components";
-
-import { hpsMeasureValue, PositiveUniversalMeasure } from "@util/values";
+import { PositiveUniversalMeasure, hpsMeasureValue } from "@util/values";
 
 // This represents element type CT_OnOff, which indicate a boolean value.
 //
@@ -89,7 +88,8 @@ export class StringContainer extends XmlComponent {
     }
 }
 
-export class BuilderElement<T extends AttributeData> extends XmlComponent {
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export class BuilderElement<T extends AttributeData = {}> extends XmlComponent {
     public constructor({
         name,
         attributes,

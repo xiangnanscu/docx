@@ -1,4 +1,4 @@
-import { VerticalAlign, VerticalAlignElement } from "@file/vertical-align";
+import { TableVerticalAlign, VerticalAlignElement } from "@file/vertical-align";
 import { IgnoreIfEmptyXmlComponent } from "@file/xml-components";
 
 import { IShadingAttributesProperties, Shading } from "../../shading";
@@ -7,24 +7,24 @@ import { ITableWidthProperties, TableWidthElement } from "../table-width";
 import {
     GridSpan,
     ITableCellBorders,
-    TableCellBorders,
     TDirection,
+    TableCellBorders,
     TextDirection,
     VerticalMerge,
     VerticalMergeType,
 } from "./table-cell-components";
 
-export interface ITableCellPropertiesOptions {
+export type ITableCellPropertiesOptions = {
     readonly shading?: IShadingAttributesProperties;
     readonly margins?: ITableCellMarginOptions;
-    readonly verticalAlign?: (typeof VerticalAlign)[keyof typeof VerticalAlign];
+    readonly verticalAlign?: TableVerticalAlign;
     readonly textDirection?: (typeof TextDirection)[keyof typeof TextDirection];
     readonly verticalMerge?: (typeof VerticalMergeType)[keyof typeof VerticalMergeType];
     readonly width?: ITableWidthProperties;
     readonly columnSpan?: number;
     readonly rowSpan?: number;
     readonly borders?: ITableCellBorders;
-}
+};
 
 export class TableCellProperties extends IgnoreIfEmptyXmlComponent {
     public constructor(options: ITableCellPropertiesOptions) {
